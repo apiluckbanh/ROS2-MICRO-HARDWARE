@@ -15,7 +15,9 @@ Firmware สำหรับ LUNA Mecanum Robot รันบน ESP32-S3 ใช�
 ```
 LUNA_BOT/
 ├── config/
-│   └── luna_robot.h          # ค่า config หลักของหุ่นยนต์ (pin, PID, wheel)
+│   ├── luna_robot.h          # config สำหรับ LUNA robot (ESP32-S3, LUNA Motor Driver)
+│   ├── lulu_robot.h          # config สำหรับ LULU robot (ESP32, Cytron MD10C)
+│   └── custom_robot.h        # config สำหรับ robot ที่กำหนดเอง
 ├── main/
 │   ├── platformio.ini        # config สำหรับ firmware หลัก
 │   ├── src/
@@ -179,13 +181,69 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
 ## 3. Clone โปรเจกต์
 
 ```bash
-git clone https://github.com/banh0001/luna_mecanum_robot_hardware.git
-cd luna_mecanum_robot_hardware
+git clone https://github.com/apiluckbanh/ROS2-MICRO-HARDWARE.git
+cd ROS2-MICRO-HARDWARE
 ```
 
 ---
 
-## 4. ตั้งค่าหุ่นยนต์ (`config/luna_robot.h`)
+## 4. เลือก Robot Configuration
+
+โปรเจกต์รองรับ **3 หุ่นยนต์** ในไฟล์ firmware เดียวกัน เลือกได้ผ่าน PlatformIO environment
+
+### ตารางเปรียบเทียบ
+
+| | `luna_robot` | `lulu_robot` | `custom_robot` |
+|---|---|---|---|
+| **Config file** | `luna_robot.h` | `lulu_robot.h` | `custom_robot.h` |
+| **ESP32 Board** | ESP32-S3 DevKit C1 | ESP32 Dev (30-pin) | ESP32 Dev (30-pin) |
+| **USB Port** | `/dev/ttyACM0` | `/dev/ttyUSB0` | `/dev/ttyUSB0` |
+| **Motor Driver** | LUNA Motor Driver | Cytron MD10C | LUNA Motor Driver |
+| **Wheel Diameter** | 65 mm | 100 mm | กำหนดเอง |
+
+### Build และ Upload แต่ละ Robot
+
+```bash
+cd main
+
+# LUNA robot (ESP32-S3)
+pio run -e luna_robot -t upload
+
+# LULU robot (ESP32 + Cytron MD10C)
+pio run -e lulu_robot -t upload
+
+# Custom robot (แก้ config/custom_robot.h ก่อน)
+pio run -e custom_robot -t upload
+```
+
+หรือใน VS Code: คลิกที่ชื่อ environment ที่ status bar ด้านล่าง → เลือก environment ที่ต้องการ → กด Upload (→)
+
+### วิธีแก้ config ของแต่ละ Robot
+
+แก้ไขไฟล์ config ที่ตรงกับ environment ที่ใช้:
+
+| Environment | ไฟล์ที่ต้องแก้ |
+|---|---|
+| `luna_robot` | `config/luna_robot.h` |
+| `lulu_robot` | `config/lulu_robot.h` |
+| `custom_robot` | `config/custom_robot.h` |
+
+firmware จะ include config ที่ถูกต้องอัตโนมัติผ่าน build flag:
+
+```cpp
+// firmware.ino — ไม่ต้องแก้ไฟล์นี้
+#ifdef LULU_ROBOT_CONFIG
+    #include "lulu_robot.h"
+#elif defined(CUSTOM_ROBOT_CONFIG)
+    #include "custom_robot.h"
+#else
+    #include "luna_robot.h"   // default
+#endif
+```
+
+---
+
+## 4.1 ตั้งค่าหุ่นยนต์ (`config/luna_robot.h`)
 
 ไฟล์นี้คือหัวใจของ config ทั้งหมด แก้ค่าให้ตรงกับฮาร์ดแวร์ก่อนอัพโหลด
 
@@ -282,21 +340,27 @@ flowchart TD
     MSGS --> QUAT["compute quaternion\nx, y, z, w"]
     QUAT --> GETT[["getTime"]]
     GETT --> STAMP["stamp header.stamp = time_stamp"]
-    STAMP --> RPMDATA["rpm_data[0–3] = rpm[1–4]"]
-    RPMDATA --> PUB[("publish\n/imu/data\n/odom_unfiltered\n/motor/rpm")]
+    STAMP --> RPMDATA["rpm_data[0–3] = rpm[1–4]\nticks_data[0–3] = encoder.read()"]
+    RPMDATA --> PUB[("publish\n/imu/data\n/odom_unfiltered\n/motor/rpm\n/motor/ticks")]
 ```
 
 ### Build และ Upload
 
 **ใน VS Code:**
 1. เปิดโฟลเดอร์ `main/` ด้วย PlatformIO
-2. กดปุ่ม **Build** (✓) หรือ **Upload** (→) ที่ status bar ด้านล่าง
+2. คลิก environment ที่ status bar ด้านล่าง → เลือก robot ที่ต้องการ
+3. กดปุ่ม **Build** (✓) หรือ **Upload** (→)
 
 **ใน Terminal:**
 ```bash
 cd main
-pio run                        # แค่ build
-pio run -e luna_robot -t upload        # build + upload
+pio run -e luna_robot          # build LUNA (ESP32-S3)
+pio run -e lulu_robot          # build LULU (ESP32)
+pio run -e custom_robot        # build Custom (ESP32)
+
+pio run -e luna_robot   -t upload   # upload LUNA
+pio run -e lulu_robot   -t upload   # upload LULU
+pio run -e custom_robot -t upload   # upload Custom
 ```
 
 ### Topics ที่ firmware หลัก Publish/Subscribe
@@ -307,6 +371,7 @@ pio run -e luna_robot -t upload        # build + upload
 | `odom/unfiltered` | `nav_msgs/Odometry` | Publish | ข้อมูล odometry |
 | `imu/data` | `sensor_msgs/Imu` | Publish | ข้อมูล accelerometer + gyroscope |
 | `motor/rpm` | `std_msgs/Float32MultiArray` | Publish | RPM ของมอเตอร์ทั้ง 4 |
+| `motor/ticks` | `std_msgs/Int32MultiArray` | Publish | Encoder tick count สะสมของมอเตอร์ทั้ง 4 |
 
 ### เชื่อมต่อ micro-ROS Agent (บน PC)
 
@@ -314,8 +379,11 @@ pio run -e luna_robot -t upload        # build + upload
 # ติดตั้ง agent (ครั้งแรกครั้งเดียว) ดูคลิปนี้
 https://youtu.be/F4KXbHpUiv4?si=xijBHGEX6vcmlbPy
 
-# รัน agent
+# รัน agent — LUNA robot (ESP32-S3, ttyACM0)
 ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 -b 921600
+
+# รัน agent — LULU / Custom robot (ESP32, ttyUSB0)
+ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 921600
 ```
 
 ---
@@ -536,13 +604,17 @@ Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z
 
 ```
 1. ติดตั้ง PlatformIO
-2. แก้ config/luna_robot.h ให้ตรงกับ pin และ hardware
-3. Upload test firmware → ทดสอบ IMU ด้วยคำสั่ง imu
-4. Upload test firmware → ทดสอบมอเตอร์ด้วยคำสั่ง spin
-5. วัด COUNTS_PER_REV ด้วยคำสั่ง sample หรือ ticks
-6. อัพเดทค่า COUNTS_PER_REV ใน config/luna_robot.h
-7. ปรับ PID ด้วยคำสั่ง test และ testall จนกว่า current_rpm ตาม req_rpm ได้ดี
-8. Upload main firmware และเชื่อมต่อ micro-ROS Agent
+2. เลือก config file ที่ตรงกับหุ่นยนต์ของคุณ:
+     LUNA  → config/luna_robot.h
+     LULU  → config/lulu_robot.h
+     อื่นๆ → config/custom_robot.h
+3. แก้ config file ให้ตรงกับ pin และ hardware จริง
+4. Upload test firmware ด้วย environment ที่ตรงกัน → ทดสอบ IMU ด้วยคำสั่ง imu
+5. Upload test firmware → ทดสอบมอเตอร์ด้วยคำสั่ง spin
+6. วัด COUNTS_PER_REV ด้วยคำสั่ง sample หรือ ticks
+7. อัพเดทค่า COUNTS_PER_REV ใน config file ของหุ่นยนต์นั้น
+8. ปรับ PID ด้วยคำสั่ง test และ testall จนกว่า current_rpm ตาม req_rpm ได้ดี
+9. Upload main firmware ด้วย environment เดิม และเชื่อมต่อ micro-ROS Agent
 ```
 
 ---
@@ -552,8 +624,10 @@ Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z
 | ปัญหา | สาเหตุ | แนวทางแก้ |
 |---|---|---|
 | Upload ไม่ได้ — `Permission denied /dev/ttyACM0` | ยังไม่มีสิทธิ์ USB | รัน `sudo usermod -aG dialout $USER` แล้ว reboot |
-| Upload ไม่ได้ — port ไม่เจอ | ยังไม่ได้กด Boot button | กดค้าง **BOOT** บน ESP32-S3 ตอนกด Upload |
-| `imu` command พิมพ์ ERROR | สาย I2C ผิด หรือ address ผิด | ตรวจ SDA/SCL pin ใน `luna_robot.h` และตรวจสายต่อ |
-| micro-ROS Agent ต่อไม่ได้ | baud rate ไม่ตรง | ตรวจ `monitor_speed` ใน `main/platformio.ini` ต้องเป็น 921600 |
+| Upload ไม่ได้ — port ไม่เจอ (LUNA) | ยังไม่ได้กด Boot button | กดค้าง **BOOT** บน ESP32-S3 ตอนกด Upload |
+| Upload ไม่ได้ — port ไม่เจอ (LULU/Custom) | USB-to-UART ไม่เจอ port | ตรวจว่า `/dev/ttyUSB0` มีอยู่ด้วย `ls /dev/ttyUSB*` |
+| `imu` command พิมพ์ ERROR | สาย I2C ผิด หรือ address ผิด | ตรวจ SDA/SCL pin ใน config file ของหุ่นยนต์และตรวจสายต่อ |
+| micro-ROS Agent ต่อไม่ได้ | port หรือ baud rate ไม่ตรง | LUNA ใช้ `/dev/ttyACM0`, LULU/Custom ใช้ `/dev/ttyUSB0` baud 921600 |
 | Build error `#include errors` | library ยังไม่ได้ดาวน์โหลด | รัน `pio pkg install` หรือ Build ครั้งแรกรอสักครู่ |
 | LED ไม่กะพริบหลัง upload | micro-ROS Agent ยังไม่ได้รัน | รัน agent บน PC ก่อน ESP32 จะเชื่อมต่อและ LED จะกะพริบ |
+| มอเตอร์หมุนผิดทิศทาง | `MOTORX_INV` ผิด | แก้ค่า `MOTORX_INV true/false` ใน config file ของหุ่นยนต์ |

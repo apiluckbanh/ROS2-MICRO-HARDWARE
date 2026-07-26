@@ -3,26 +3,34 @@
 // Redistribution, resale, or commercial use without written
 // permission from the author is strictly prohibited.
 // Contact: apiluck.banh@gmail.com
-
-// Copyright (c) 2021 Juan Miguel Jimeno
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #ifndef IMU_INTERFACE
 #define IMU_INTERFACE
 
+#if defined(NO_MICRO_ROS)
+// Minimal plain-C++ structs that mirror the micro_ros message layout used here
+struct geometry_msgs__msg__Vector3 {
+    double x = 0;
+    double y = 0;
+    double z = 0;
+};
+struct geometry_msgs__msg__Twist {
+    geometry_msgs__msg__Vector3 linear;
+    geometry_msgs__msg__Vector3 angular;
+};
+struct sensor_msgs__msg__Imu {
+    struct { struct { const char* data; } frame_id; } header;
+    geometry_msgs__msg__Vector3 linear_acceleration;
+    double linear_acceleration_covariance[9] = {};
+    geometry_msgs__msg__Vector3 angular_velocity;
+    double angular_velocity_covariance[9] = {};
+    geometry_msgs__msg__Vector3 orientation;
+    double orientation_covariance[9] = {};
+};
+#define micro_ros_string_utilities_set(field, str) (field)
+#else
 #include <sensor_msgs/msg/imu.h>
 #include <micro_ros_utilities/string_utilities.h>
+#endif
 
 class IMUInterface
 {

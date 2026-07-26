@@ -17,8 +17,15 @@
 #include <sensor_msgs/msg/imu.h>
 #include <geometry_msgs/msg/twist.h>
 #include <std_msgs/msg/float32_multi_array.h>
+#include <std_msgs/msg/int32_multi_array.h>
 
-#include "luna_robot.h"
+#ifdef LULU_ROBOT_CONFIG
+    #include "lulu_robot.h"
+#elif defined(CUSTOM_ROBOT_CONFIG)
+    #include "custom_robot.h"
+#else
+    #include "luna_robot.h"
+#endif
 #include "motor.h"
 #include "kinematics.h"
 #include "pid.h"
@@ -58,14 +65,17 @@
 rcl_publisher_t odom_publisher;
 rcl_publisher_t imu_publisher;
 rcl_publisher_t rpm_publisher;
+rcl_publisher_t ticks_publisher;
 rcl_subscription_t twist_subscriber;
 
 nav_msgs__msg__Odometry odom_msg;
 sensor_msgs__msg__Imu imu_msg;
 geometry_msgs__msg__Twist twist_msg;
 std_msgs__msg__Float32MultiArray rpm_msg;
+std_msgs__msg__Int32MultiArray ticks_msg;
 
 float rpm_data[4];
+int32_t ticks_data[4];
 float current_rpm1 = 0.0f;
 float current_rpm2 = 0.0f;
 float current_rpm3 = 0.0f;
@@ -133,6 +143,10 @@ void setup()
     rpm_msg.data.size     = 4;
     rpm_msg.data.capacity = 4;
 
+    ticks_msg.data.data     = ticks_data;
+    ticks_msg.data.size     = 4;
+    ticks_msg.data.capacity = 4;
+
     prev_odom_update = millis();
     prev_cmd_time    = millis();
 }
@@ -187,6 +201,11 @@ bool createEntities()
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray),
         TOPIC_PREFIX "motor/rpm"
     ));
+    RCRETCHECK(rclc_publisher_init_default(
+        &ticks_publisher, &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
+        TOPIC_PREFIX "motor/ticks"
+    ));
     RCRETCHECK(rclc_subscription_init_default(
         &twist_subscriber, &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
@@ -239,6 +258,7 @@ bool destroyEntities()
     RCSOFTCHECK(rcl_publisher_fini(&odom_publisher, &node));
     RCSOFTCHECK(rcl_publisher_fini(&imu_publisher, &node));
     RCSOFTCHECK(rcl_publisher_fini(&rpm_publisher, &node));
+    RCSOFTCHECK(rcl_publisher_fini(&ticks_publisher, &node));
     RCSOFTCHECK(rcl_subscription_fini(&twist_subscriber, &node));
     RCSOFTCHECK(rcl_timer_fini(&control_timer));
     RCSOFTCHECK(rcl_node_fini(&node));
@@ -357,9 +377,15 @@ void publishData()
     rpm_data[2] = current_rpm3;
     rpm_data[3] = current_rpm4;
 
-    RCSOFTCHECK(rcl_publish(&imu_publisher,  &imu_msg,  NULL));
-    RCSOFTCHECK(rcl_publish(&odom_publisher, &odom_msg, NULL));
-    RCSOFTCHECK(rcl_publish(&rpm_publisher,  &rpm_msg,  NULL));
+    ticks_data[0] = motor1_encoder.read();
+    ticks_data[1] = motor2_encoder.read();
+    ticks_data[2] = motor3_encoder.read();
+    ticks_data[3] = motor4_encoder.read();
+
+    RCSOFTCHECK(rcl_publish(&imu_publisher,    &imu_msg,    NULL));
+    RCSOFTCHECK(rcl_publish(&odom_publisher,   &odom_msg,   NULL));
+    RCSOFTCHECK(rcl_publish(&rpm_publisher,    &rpm_msg,    NULL));
+    RCSOFTCHECK(rcl_publish(&ticks_publisher,  &ticks_msg,  NULL));
 }
 
 struct timespec getTime()

@@ -4,31 +4,13 @@
 // permission from the author is strictly prohibited.
 // Contact: apiluck.banh@gmail.com
 
-// Copyright (c) 2021 Juan Miguel Jimeno
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 #ifndef DEFAULT_MOTOR
 #define DEFAULT_MOTOR
 
 #include <Arduino.h>
 #include "config.h"
-#ifdef ESP32
-inline void analogWriteFrequency(uint8_t pin, double frequency)
-{
-  analogWriteFrequency(frequency);
-}
-#elif defined(PICO)
+#if defined(PICO)
 inline void analogWriteFrequency(double frequency)
 {
   analogWriteFreq(frequency);
@@ -37,10 +19,63 @@ inline void analogWriteFrequency(uint8_t pin, double frequency)
 {
   analogWriteFreq(frequency);
 }
+#else
+// ESP32 Arduino 3.x dropped the pin argument — provide two-arg wrapper for call-site compatibility
+inline void analogWriteFrequency(uint8_t pin, double frequency)
+{
+  analogWriteFrequency((uint32_t)frequency);
+}
 #endif
 
 #include "motor_interface.h"
 
+
+class CytronMD10C: public MotorInterface
+{
+    private:
+        int in_pin_;
+        int pwm_pin_;
+
+    protected:
+        void forward(int pwm) override
+        {
+            if (in_pin_ < 0) return;
+            digitalWrite(in_pin_, HIGH);
+            analogWrite(pwm_pin_, abs(pwm));
+        }
+
+        void reverse(int pwm) override
+        {
+            if (in_pin_ < 0) return;
+            digitalWrite(in_pin_, LOW);
+            analogWrite(pwm_pin_, abs(pwm));
+        }
+
+    public:
+        CytronMD10C(float pwm_frequency, int pwm_bits, bool invert, int pwm_pin, int in_pin, int unused=-1):
+            MotorInterface(invert),
+            in_pin_(in_pin),
+            pwm_pin_(pwm_pin)
+        {
+            if (in_pin_ < 0) return;
+            pinMode(in_pin_, OUTPUT);
+            pinMode(pwm_pin_, OUTPUT);
+
+            if (pwm_frequency > 0)
+                analogWriteFrequency(pwm_pin_, pwm_frequency);
+            analogWriteResolution(pwm_bits);
+
+            analogWrite(pwm_pin_, 0);
+        }
+
+        void brake() override
+        {
+            if (in_pin_ < 0) return;
+            analogWrite(pwm_pin_, 0);
+        }
+};
+
+// ── LUNA_MOTOR_DRIVE : dual PWM on IN_A / IN_B ────────────────
 class LUNA_MOTOR_DRIVE: public MotorInterface
 {
     private:

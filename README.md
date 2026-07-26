@@ -29,15 +29,6 @@ LUNA_BOT/
 │       ├── motor/            # driver มอเตอร์ (LUNA_MOTOR_DRIVE)
 │       ├── odometry/         # คำนวณ odometry
 │       └── pid/              # PID controller
-└── test/
-    ├── platformio.ini        # config สำหรับ test firmware
-    └── src/
-        ├── firmware.ino      # test firmware (ไม่ต้องใช้ micro-ROS Agent)
-        ├── cmd_spin.h        # คำสั่ง spin / sample
-        ├── cmd_ticks.h       # คำสั่ง ticks
-        ├── cmd_test.h        # คำสั่ง test
-        ├── cmd_testall.h     # คำสั่ง testall
-        └── cmd_imu.h         # คำสั่ง imu
 ```
 
 ---
@@ -388,219 +379,7 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 921600
 
 ---
 
-## 6. Test Firmware (`test/`)
-
-Test firmware ใช้สำหรับทดสอบฮาร์ดแวร์ก่อนใช้งานจริง **ไม่ต้องใช้ micro-ROS Agent**
-สื่อสารผ่าน Serial Monitor ธรรมดา baud rate **115200**
-
-### Build และ Upload
-
-```bash
-cd test
-pio run -e luna_robot -t upload
-pio device monitor -e luna_robot
-```
-
-หรือใน VS Code เปิดโฟลเดอร์ `test/` แล้วกด Upload เหมือนเดิม
-
-### คำสั่งที่ใช้ได้ใน Serial Monitor
-
-เมื่อ upload เสร็จและเปิด Serial Monitor จะเห็น:
-
-```
-Type 'spin'    - spin motors at max RPM
-Type 'sample'  - spin motors and show summary
-Type 'ticks'   - measure ticks per revolution
-Type 'test'    - test PID with cmd_vel
-Type 'testall' - run all 4 motors and plot data
-Type 'imu'     - stream IMU accel/gyro data
-Press enter to clear command.
-```
-
----
-
-### คำสั่ง `spin` — หมุนมอเตอร์ทดสอบ
-
-```
-> spin
-```
-
-- หมุนมอเตอร์แต่ละตัวทีละตัวที่ PWM สูงสุด เป็นเวลา **5 วินาที**
-- ใช้ตรวจสอบทิศทางการหมุนของมอเตอร์ว่าถูกต้องหรือไม่
-- ต้องยกหุ่นยนต์ขึ้นให้ล้อลอยพ้นพื้น
-
----
-
-### คำสั่ง `sample` — วัด RPM และ Counts Per Revolution จริง
-
-```
-> sample
-```
-
-- หมุนมอเตอร์แต่ละตัวทีละตัว แล้วพิมพ์ผลสรุป:
-  - Encoder counts ที่อ่านได้
-  - Counts per revolution ที่คำนวณได้
-  - Max linear velocity และ angular velocity ของหุ่นยนต์
-- **นำค่า COUNTS PER REVOLUTION ที่ได้ไปอัพเดทใน `config/luna_robot.h`**
-
-ตัวอย่าง output ของ LUNA:
-
-**Encoder Readings**
-
-| Motor | Position | Ticks |
-|---|---|---|
-| M1 | Front Left  | 12310 |
-| M2 | Front Right | 10568 |
-| M3 | Rear Left   | 11440 |
-| M4 | Rear Right  | 10700 |
-
-**Counts Per Revolution**
-
-| Motor | Position | CPR |
-|---|---|---|
-| M1 | Front Left  | 2443 |
-| M2 | Front Right | 2102 |
-| M3 | Rear Left   | 2276 |
-| M4 | Rear Right  | 2139 |
-
-**Max Velocities**
-
-| | Value |
-|---|---|
-| Linear  | ± 0.16 m/s   |
-| Angular | ± 1.65 rad/s |
-
----
-
-### คำสั่ง `ticks` — หา Counts Per Revolution แบบ manual
-
-```
-> ticks
-```
-
-ใช้เมื่ออยากวัดด้วยตัวเอง:
-
-1. มอเตอร์แต่ละตัวจะหมุนช้า ๆ
-2. **นับจำนวนรอบที่ล้อหมุนด้วยตาตัวเอง** แล้วจด
-3. อ่านค่า `final_tick_count` ที่พิมพ์ออกมา
-4. คำนวณ: `COUNTS_PER_REV = final_tick_count ÷ จำนวนรอบที่นับ`
-5. นำค่าที่ได้ไปใส่ใน `config/luna_robot.h`
-
----
-
-### คำสั่ง `test` — ทดสอบ PID ทีละมอเตอร์
-
-```
-> test
-```
-
-- ทดสอบ PID controller โดยสั่ง `cmd_vel` ที่ `linear.x = 0.5 m/s`
-- วิ่งมอเตอร์ทีละตัว เป็นเวลา **5 วินาที** ต่อตัว
-- พิมพ์ค่า `req_rpm`, `current_rpm`, `pwm` ทุก 100ms
-
-ตัวอย่าง output:
-```
-req_rpm:: 24.39  current_rpm:: 23.80  pwm:: 145
-req_rpm:: 24.39  current_rpm:: 24.41  pwm:: 142
-```
-
-ถ้า `current_rpm` ห่างจาก `req_rpm` มาก ให้ปรับค่า PID ใน `config/luna_robot.h`:
-- เพิ่ม `K_P` ถ้า response ช้าเกินไป
-- เพิ่ม `K_I` ถ้ามี steady-state error
-- เพิ่ม `K_D` ถ้า overshoot มาก
-
----
-
-### คำสั่ง `testall` — ทดสอบ 4 มอเตอร์พร้อมกัน + Serial Plotter
-
-```
-> testall
-```
-
-- รันมอเตอร์ทั้ง 4 พร้อมกันเป็นเวลา **5 วินาที**
-- พิมพ์ CSV format: `M1_req, M1_cur, M1_pwm, M2_req, M2_cur, M2_pwm, ...`
-- กดปุ่มใดก็ได้เพื่อหยุด
-
-**ดูกราฟใน Serial Plotter:**
-1. ใน VS Code PlatformIO → เปิด **Serial Plotter** (ไม่ใช่ Serial Monitor)
-2. พิมพ์ `testall` แล้ว Enter
-3. จะเห็นกราฟ RPM ของแต่ละมอเตอร์แบบ realtime
-
----
-
-### `plot_motors.py` — วิเคราะห์ PID Step Response
-
-Script Python สำหรับดูกราฟ PID response ของมอเตอร์ทั้ง 4 พร้อมกัน พร้อมคำนวณ metrics อัตโนมัติ
-
-**ติดตั้ง dependencies (ครั้งแรกครั้งเดียว):**
-```bash
-pip install pyserial numpy matplotlib
-```
-
-**วิธีใช้งาน:**
-
-แบบที่ 1 — เชื่อมต่อ serial อัตโนมัติ (upload test firmware ก่อน):
-```bash
-cd test
-python3 plot_motors.py
-```
-Script จะส่งคำสั่ง `testall` ให้บอร์ดเองและเก็บข้อมูลอัตโนมัติ
-
-แบบที่ 2 — อ่านจากไฟล์ที่บันทึกไว้:
-```bash
-python3 plot_motors.py motor_log.txt
-```
-
-**ผลลัพธ์ที่ได้:**
-- กราฟ RPM step response ของ Motor 1–4 แยกกัน
-- คำนวณ metrics ทุก motor:
-  - **Rise Time** — เวลาที่ RPM ไต่จาก 10% → 90% ของ target
-  - **Peak Time** — เวลาที่ RPM ถึงจุดสูงสุด
-  - **Settling Time** — เวลาที่ RPM เข้าสู่ช่วง ±5% ของ target
-  - **Overshoot** — % ที่ RPM เกิน target
-  - **Steady State Error** — % ความคลาดเคลื่อนตอนนิ่ง
-
-ใช้ผลนี้ตัดสินใจปรับค่า PID ใน `config/luna_robot.h`
-
-**ตัวอย่างกราฟ:**
-
-![PID Response](docs/images/pid_response.png)
-
-**ผลตอบสนองตาม(Control Performance):**
-
-![Best PID Response](docs/images/goodpidresponse.png)
-
----
-
-### คำสั่ง `imu` — ทดสอบ IMU
-
-```
-> imu
-```
-
-- Initialize MPU6050 บน I2C (SDA=2, SCL=1)
-- Calibrate gyroscope อัตโนมัติ (วางนิ่ง ๆ ประมาณ 2 วินาที)
-- Stream ข้อมูล 20 Hz ในรูปแบบ CSV:
-
-```
-Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z
--0.0123,0.0456,9.8100,0.0001,-0.0002,0.0000
-```
-
-หน่วย:
-- Accelerometer → **m/s²**
-- Gyroscope → **rad/s** (หักค่า bias แล้ว)
-
-กดปุ่มใดก็ได้ใน Serial Monitor เพื่อหยุด
-
-**ตรวจสอบผล:**
-- วางนิ่งบนพื้นราบ: `Accel_Z` ควรใกล้ **9.81** และ `Accel_X`, `Accel_Y` ใกล้ **0**
-- Gyro ทั้ง 3 แกนควรใกล้ **0** เมื่อไม่มีการหมุน
-- ถ้า IMU init ล้มเหลว ให้ตรวจสาย SDA/SCL และ I2C address
-
----
-
-## 7. ลำดับการ Setup หุ่นยนต์ครั้งแรก
+## 6. ลำดับการ Setup หุ่นยนต์ครั้งแรก
 
 ```
 1. ติดตั้ง PlatformIO
@@ -609,17 +388,14 @@ Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z
      LULU  → config/lulu_robot.h
      อื่นๆ → config/custom_robot.h
 3. แก้ config file ให้ตรงกับ pin และ hardware จริง
-4. Upload test firmware ด้วย environment ที่ตรงกัน → ทดสอบ IMU ด้วยคำสั่ง imu
-5. Upload test firmware → ทดสอบมอเตอร์ด้วยคำสั่ง spin
-6. วัด COUNTS_PER_REV ด้วยคำสั่ง sample หรือ ticks
-7. อัพเดทค่า COUNTS_PER_REV ใน config file ของหุ่นยนต์นั้น
-8. ปรับ PID ด้วยคำสั่ง test และ testall จนกว่า current_rpm ตาม req_rpm ได้ดี
-9. Upload main firmware ด้วย environment เดิม และเชื่อมต่อ micro-ROS Agent
+4. อัพเดทค่า COUNTS_PER_REV ใน config file ให้ตรงกับ encoder จริง
+5. Upload main firmware ด้วย environment ที่ตรงกัน
+6. รัน micro-ROS Agent บน PC แล้วตรวจสอบ topics ด้วย ros2 topic echo
 ```
 
 ---
 
-## 8. แก้ปัญหาที่พบบ่อย
+## 7. แก้ปัญหาที่พบบ่อย
 
 | ปัญหา | สาเหตุ | แนวทางแก้ |
 |---|---|---|

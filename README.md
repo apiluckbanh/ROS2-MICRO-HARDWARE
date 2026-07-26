@@ -172,8 +172,8 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
 ## 3. Clone โปรเจกต์
 
 ```bash
-git clone https://github.com/apiluckbanh/ROS2-MICRO-HARDWARE.git
-cd ROS2-MICRO-HARDWARE
+git clone https://github.com/s6602013620199-wq/microROS-mecanumwheel.git
+cd microROS-mecanumwheel
 ```
 
 ---

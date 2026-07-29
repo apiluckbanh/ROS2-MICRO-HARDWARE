@@ -45,6 +45,8 @@ LUNA_BOT/
 ### วิธีที่ 2 — Command Line (Linux/macOS)
 
 ```bash
+sudo apt install pipx
+pipx ensurepath
 pip install platformio
 ```
 

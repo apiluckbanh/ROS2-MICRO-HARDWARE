@@ -207,6 +207,12 @@ pio run -e lulu_robot -t upload
 
 # Custom robot (แก้ config/custom_robot.h ก่อน)
 pio run -e custom_robot -t upload
+
+#เอาไว้อัพโหลดโค้ค สำหรับ esp32s3 ที่ใช้มอเตอร์ไดรฟ์ ประเภท pwm2อัน เช่น m1a m1b
+pio run -e luna_robot -t upload
+
+#เอาไว้เปิด ดู  monitor สำหรับการพิมคำสั่งใช้งาน
+pio device monitor -e luna_robot
 ```
 
 หรือใน VS Code: คลิกที่ชื่อ environment ที่ status bar ด้านล่าง → เลือก environment ที่ต้องการ → กด Upload (→)

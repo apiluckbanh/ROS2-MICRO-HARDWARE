@@ -213,6 +213,8 @@ pio run -e luna_robot -t upload
 
 #เอาไว้เปิด ดู  monitor สำหรับการพิมคำสั่งใช้งาน
 pio device monitor -e luna_robot
+#พอตกราฟ pid 4motor
+python3 plot_motors.py
 ```
 
 หรือใน VS Code: คลิกที่ชื่อ environment ที่ status bar ด้านล่าง → เลือก environment ที่ต้องการ → กด Upload (→)

@@ -59,7 +59,7 @@ pio --version
 ### วิธีที่ 3 — Python Script (แนะนำสำหรับ Linux headless)
 
 ```bash
-python3 -c "$(curl -fsSL https://raw.githubusercontent.com/platformio/platformio/master/scripts/get-platformio.py)"
+curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o get-platformio.py && python3 get-platformio.py
 ```
 
 เพิ่ม PlatformIO เข้า PATH:

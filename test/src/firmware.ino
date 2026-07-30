@@ -5,7 +5,13 @@
 
 #include <geometry_msgs/msg/twist.h>
 #include <sensor_msgs/msg/imu.h>
-#include "luna_robot.h"
+#ifdef LULU_ROBOT_CONFIG
+    #include "lulu_robot.h"
+#elif defined(CUSTOM_ROBOT_CONFIG)
+    #include "custom_robot.h"
+#else
+    #include "luna_robot.h"
+#endif
 #include "imu.h"
 #include "motor.h"
 #include "pid.h"

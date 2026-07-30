@@ -207,6 +207,18 @@ pio run -e lulu_robot -t upload
 
 # Custom robot (แก้ config/custom_robot.h ก่อน)
 pio run -e custom_robot -t upload
+
+## อัพโหลด EPS32 30 pin
+pio run -e lulu_robot -t upload
+
+## เปิด serial
+pio device monitor -e lulu_robot
+
+# LUNA robot (ESP32-S3)
+pio run -e luna_robot -t upload
+
+## เปิด serial
+pio device monitor -e luna_robot
 ```
 
 หรือใน VS Code: คลิกที่ชื่อ environment ที่ status bar ด้านล่าง → เลือก environment ที่ต้องการ → กด Upload (→)
